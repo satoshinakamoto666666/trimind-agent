@@ -1,0 +1,16 @@
+[Unit]
+Description=TriMind Agent - Autonomous AI DeFi Agent for X Layer
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/OKXBuildXHackathon
+ExecStart=/usr/bin/python3 /root/OKXBuildXHackathon/src/main.py
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/root/OKXBuildXHackathon/.env
+
+[Install]
+WantedBy=multi-user.target
