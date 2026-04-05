@@ -19,6 +19,20 @@
 
 TriMind Agent is a 3-mind autonomous DeFi council on OKX X Layer where no on-chain action executes unless 2 of 3 minds agree.
 
+## Screenshots
+
+### Live Discord Council and Portfolio Feed
+
+![TriMind live Discord council feed](screenshots/001.png)
+
+### Live Rebalance Execution on X Layer
+
+![TriMind live rebalance execution](screenshots/002.png)
+
+### Public Launch Post
+
+![TriMind public launch post](screenshots/003.png)
+
 ---
 
 ## How It Works
