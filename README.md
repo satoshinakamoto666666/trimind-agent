@@ -11,6 +11,14 @@
 
 **Track**: X Layer Arena | **Hackathon**: OKX Build-X 2026 | **Chain**: X Layer (196) | **Discord**: [Join](https://discord.gg/vzHv7F2qpT)
 
+## Demo
+
+- Demo Video: https://www.youtube.com/shorts/usw5y4rTg0E
+- X Post: https://x.com/trimind_agent/status/2040731057499357388?s=20
+- Agentic Wallet: `0xbcd403e543529cb9e6a90fd736f4477bcd9ad8c8`
+
+TriMind Agent is a 3-mind autonomous DeFi council on OKX X Layer where no on-chain action executes unless 2 of 3 minds agree.
+
 ---
 
 ## How It Works
