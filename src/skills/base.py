@@ -78,8 +78,12 @@ def security_scan(token_address: str, chain: str = "196") -> dict | None:
 
 
 def market_price(token_address: str, chain: str = "196") -> dict | None:
-    ok, data = run_skill(["market", "price", "--address", token_address, "--chain", chain])
-    return data if ok else None
+    ok, data = run_skill(["token", "price-info", "--address", token_address, "--chain", chain])
+    if not ok or data is None:
+        return None
+    if isinstance(data, list) and data:
+        return data[0] if isinstance(data[0], dict) else {}
+    return data.get("data", data) if isinstance(data, dict) else None
 
 
 def market_kline(token_address: str, chain: str = "196", bar: str = "5m", limit: int = 20) -> dict | None:
@@ -88,14 +92,21 @@ def market_kline(token_address: str, chain: str = "196", bar: str = "5m", limit:
     return data if ok else None
 
 
-def signal_list(chain: str = "196", tracker_type: str = "smart_money") -> list | None:
+def signal_list(chain: str = "196", tracker_type: str = "smart_money") -> list:
+    """Get SM/KOL/whale signals. Always returns a list."""
     ok, data = run_skill(["tracker", "activities", "--tracker-type", tracker_type,
-                          "--chain", chain.replace("196", "xlayer"), "--trade-type", "1"])
+                          "--chain", "solana", "--trade-type", "1"])
     if not ok or data is None:
-        return None
+        return []
     if isinstance(data, list):
         return data
-    return data.get("data", [])
+    inner = data.get("data", data)
+    if isinstance(inner, list):
+        return inner
+    if isinstance(inner, dict):
+        trades = inner.get("trades", inner.get("data", []))
+        return trades if isinstance(trades, list) else []
+    return []
 
 
 def token_info(token_address: str, chain: str = "196") -> dict | None:
@@ -114,14 +125,15 @@ def token_price_info(token_address: str, chain: str = "196") -> dict | None:
     return data.get("data", data) if isinstance(data, dict) else {}
 
 
-def trenches_scan(chain: str = "196") -> list | None:
-    """Scan meme tokens via dex-trenches."""
-    ok, data = run_skill(["memepump", "tokens", "--chain", chain.replace("196", "xlayer"), "--stage", "GROWING"])
-    if not ok:
-        return None
+def trenches_scan(chain: str = "196") -> list:
+    """Scan meme tokens via dex-trenches. Returns list, never None."""
+    ok, data = run_skill(["memepump", "tokens", "--chain", "solana", "--stage", "GROWING"])
+    if not ok or data is None:
+        return []
     if isinstance(data, list):
         return data
-    return data.get("data", [])
+    inner = data.get("data", [])
+    return inner if isinstance(inner, list) else []
 
 
 def trenches_dev_info(token_address: str, chain: str = "196") -> dict | None:

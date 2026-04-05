@@ -159,7 +159,10 @@ class TriMindAgent:
     def _security_scan(self, market_data: dict):
         """Run okx-security on any new tokens from signals/memes."""
         scanned = set()
-        for item in (market_data.get("signals", []) + market_data.get("memes", [])):
+        signals = market_data.get("signals", [])
+        memes = market_data.get("memes", [])
+        items = (signals if isinstance(signals, list) else []) + (memes if isinstance(memes, list) else [])
+        for item in items:
             addr = item.get("tokenAddress", item.get("address", ""))
             if not addr or addr in scanned:
                 continue
