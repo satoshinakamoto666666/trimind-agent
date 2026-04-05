@@ -156,6 +156,7 @@ def swap_execute(from_token: str, to_token: str, amount_usd: float, chain: str =
     cmd = [ONCHAINOS, "swap", "execute", "--chain", chain,
            "--from", from_token, "--to", to_token,
            "--readable-amount", str(amount_usd), "--slippage", slippage, "--wallet", w]
+    LOG.info("SWAP CMD: %s", " ".join(cmd))
     try:
         env = _build_env()
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
