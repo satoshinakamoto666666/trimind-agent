@@ -23,7 +23,7 @@ Your response must be EXACTLY this JSON format (no markdown, no explanation):
   "vote": "EXECUTE" or "SKIP" or "HOLD",
   "confidence": 0.0 to 1.0,
   "reasoning": "one sentence why",
-  "action": "supply_aave" or "swap" or "lp_add" or "lp_remove" or "withdraw" or "none",
+  "action": "supply_aave" or "swap" or "rebalance" or "diversify" or "lp_add" or "lp_remove" or "withdraw" or "none",
   "risk_score": 0.0 to 1.0
 }
 """
@@ -99,30 +99,67 @@ async def _call_grok(prompt: str, data: str) -> dict | None:
 
 
 def _agent_logic_vote(market_data: dict) -> dict:
-    """Third mind: rule-based agent logic (no API call, instant)."""
+    """Third mind: rule-based agent logic (no API call, instant).
+
+    Strategy priorities:
+        1. Security reject if risk detected
+        2. Rebalance if USDT > 2x USDC (too concentrated)
+        3. Diversify into OKB occasionally (every ~5th cycle when OKB is low)
+        4. Supply/swap USDC→USDT if idle USDC > $10
+        5. Hold if balanced
+    """
     portfolio = market_data.get("portfolio", {})
     signals = market_data.get("signals", [])
     security = market_data.get("security", {})
 
-    # Simple heuristic rules
     idle_usdc = float(portfolio.get("usdc_balance", 0))
-    aave_supplied = float(portfolio.get("aave_supplied", 0))
+    usdt_bal = float(portfolio.get("usdt_balance", 0))
+    okb_bal = float(portfolio.get("okb_balance", 0))
+    total_usd = float(portfolio.get("total_usd", 0)) or 1.0  # avoid div-by-zero
     has_opportunity = len(signals) > 0
     is_safe = security.get("safe", True)
 
+    # 1. Security reject
     if not is_safe:
         return {"vote": "SKIP", "confidence": 0.9, "reasoning": "Security risk detected",
                 "action": "none", "risk_score": 0.8}
 
-    if idle_usdc > 10 and aave_supplied < idle_usdc * 3:
-        return {"vote": "EXECUTE", "confidence": 0.7, "reasoning": "Idle USDC should earn yield on Aave",
+    # 2. Rebalance: if USDT is more than double USDC, swap some back
+    if usdt_bal > idle_usdc * 2 and usdt_bal > 3:
+        return {"vote": "EXECUTE", "confidence": 0.75,
+                "reasoning": f"USDT ${usdt_bal:.0f} > 2x USDC ${idle_usdc:.0f}, rebalance needed",
+                "action": "rebalance", "risk_score": 0.1}
+
+    # 3. Rebalance: if USDT > 60% of total portfolio
+    if usdt_bal > total_usd * 0.6 and usdt_bal > 3:
+        return {"vote": "EXECUTE", "confidence": 0.7,
+                "reasoning": f"USDT is {usdt_bal/total_usd*100:.0f}% of portfolio, rebalancing to USDC",
+                "action": "rebalance", "risk_score": 0.1}
+
+    # 4. Diversify: buy small OKB if we have none and enough USDC
+    #    Use timestamp-based pseudo-randomness to trigger ~20% of cycles
+    import time as _t
+    cycle_hash = int(_t.time()) % 5
+    if okb_bal < 0.01 and idle_usdc > 10 and cycle_hash == 0:
+        return {"vote": "EXECUTE", "confidence": 0.65,
+                "reasoning": "No OKB exposure, diversifying small amount into native token",
+                "action": "diversify", "risk_score": 0.2}
+
+    # 5. Supply/yield: idle USDC should be put to work
+    if idle_usdc > 10:
+        return {"vote": "EXECUTE", "confidence": 0.7,
+                "reasoning": f"Idle USDC ${idle_usdc:.0f} should earn yield (swap to USDT)",
                 "action": "supply_aave", "risk_score": 0.1}
 
-    if has_opportunity and is_safe:
-        return {"vote": "EXECUTE", "confidence": 0.6, "reasoning": "Signal detected, safe to trade",
+    # 6. Opportunity swap on signal
+    if has_opportunity and is_safe and idle_usdc > 5:
+        return {"vote": "EXECUTE", "confidence": 0.6,
+                "reasoning": "Signal detected, safe to trade USDC→USDT",
                 "action": "swap", "risk_score": 0.3}
 
-    return {"vote": "HOLD", "confidence": 0.5, "reasoning": "No clear opportunity",
+    # 7. Balanced -- hold
+    return {"vote": "HOLD", "confidence": 0.5,
+            "reasoning": f"Portfolio balanced (USDC=${idle_usdc:.0f} USDT=${usdt_bal:.0f}), no action needed",
             "action": "none", "risk_score": 0.0}
 
 

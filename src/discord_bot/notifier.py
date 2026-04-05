@@ -83,7 +83,17 @@ class TriMindNotifier:
         ]
 
         portfolio = market_data.get("portfolio", {})
-        fields.append({"name": "Portfolio", "value": f"${portfolio.get('total_usd', 0):.2f} | USDC: ${portfolio.get('usdc_balance', 0):.2f}", "inline": False})
+        signals = market_data.get("signals", [])
+        signal_count = len(signals) if isinstance(signals, list) else market_data.get("signal_count", 0)
+
+        portfolio_parts = [
+            f"USDC: ${portfolio.get('usdc_balance', 0):,.2f}",
+            f"USDT: ${portfolio.get('usdt_balance', 0):,.2f}",
+            f"OKB: {portfolio.get('okb_balance', 0):,.4f}",
+            f"**Total: ${portfolio.get('total_usd', 0):,.2f}**",
+        ]
+        fields.append({"name": "Portfolio", "value": " | ".join(portfolio_parts), "inline": False})
+        fields.append({"name": "Signals", "value": f"{signal_count} signal(s) evaluated", "inline": True})
 
         title = f"{'🟢 EXECUTE' if execute else '⏸️ HOLD'}: {action.upper()}" if consensus else "🔴 NO CONSENSUS"
 
@@ -120,6 +130,55 @@ class TriMindNotifier:
                 {"name": "Action", "value": action, "inline": True},
                 {"name": "Amount", "value": f"${amount:.2f}", "inline": True},
                 {"name": "Result", "value": str(result)[:200], "inline": False},
+            ],
+            "timestamp": self._iso(),
+        })
+
+    def report_portfolio(self, balance_data: dict):
+        """Show current X Layer portfolio breakdown."""
+        usdc = balance_data.get("usdc_balance", 0)
+        usdt = balance_data.get("usdt_balance", 0)
+        okb = balance_data.get("okb_balance", 0)
+        total = balance_data.get("total_usd", 0)
+        aave = balance_data.get("aave_positions", [])
+
+        fields = [
+            {"name": "USDC", "value": f"${usdc:,.2f}", "inline": True},
+            {"name": "USDT", "value": f"${usdt:,.2f}", "inline": True},
+            {"name": "OKB", "value": f"{okb:,.4f}", "inline": True},
+            {"name": "Total USD Value", "value": f"**${total:,.2f}**", "inline": False},
+        ]
+
+        if aave:
+            aave_lines = []
+            for pos in aave:
+                side = pos.get("side", "supply")
+                token = pos.get("token", "?")
+                amt = pos.get("amount", 0)
+                apy = pos.get("apy", 0)
+                aave_lines.append(f"{side.upper()} {amt:,.2f} {token} @ {apy:.2f}% APY")
+            fields.append({"name": "Aave Positions", "value": "\n".join(aave_lines) or "None", "inline": False})
+
+        self._send({
+            "title": "💼 X LAYER PORTFOLIO",
+            "color": BLUE,
+            "fields": fields,
+            "timestamp": self._iso(),
+        })
+
+    def report_security_scan(self, token: str, risk_score: float, safe: bool, details: str):
+        """Show security scan results for a token."""
+        verdict = "✅ SAFE" if safe else "🚨 UNSAFE"
+        color = GREEN if safe else RED
+
+        self._send({
+            "title": f"🔍 SECURITY SCAN: {verdict}",
+            "color": color,
+            "fields": [
+                {"name": "Token", "value": f"`{token}`", "inline": False},
+                {"name": "Risk Score", "value": f"**{risk_score:.1f}** / 100", "inline": True},
+                {"name": "Verdict", "value": verdict, "inline": True},
+                {"name": "Details", "value": details[:1024] if details else "No details", "inline": False},
             ],
             "timestamp": self._iso(),
         })

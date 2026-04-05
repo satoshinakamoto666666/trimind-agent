@@ -163,16 +163,21 @@ class TriMindAgent:
         self.api_calls += 1
         data["audit"] = audit
 
-        LOG.info("Market data gathered: portfolio=$%.2f signals=%d memes=%d api_calls=%d",
+        LOG.info("Market data gathered: USDC=$%.2f USDT=$%.2f OKB=%.4f signals=%d memes=%d api_calls=%d",
                  data["portfolio"].get("usdc_balance", 0),
+                 data["portfolio"].get("usdt_balance", 0),
+                 data["portfolio"].get("okb_balance", 0),
                  len(data["signals"]), len(data["memes"]), self.api_calls)
         return data
 
     def _parse_portfolio(self, raw: dict | None) -> dict:
         """Extract key portfolio metrics from onchainos wallet balance."""
         if not raw:
-            return {"usdc_balance": 0, "total_usd": 0, "aave_supplied": 0}
+            return {"usdc_balance": 0, "usdt_balance": 0, "okb_balance": 0,
+                    "total_usd": 0, "aave_supplied": 0}
         usdc = 0
+        usdt = 0
+        okb = 0
         total = 0
         try:
             # onchainos wallet balance returns {ok, data: {details: [{tokenAssets: [...]}]}}
@@ -186,11 +191,16 @@ class TriMindAgent:
                     val = bal * price
                     total += val
                     sym = str(t.get("symbol", "")).upper()
-                    if sym in ("USDC", "USDT"):
-                        usdc += bal  # use raw balance not USD value for stables
+                    if sym == "USDC":
+                        usdc += bal
+                    elif sym == "USDT":
+                        usdt += bal
+                    elif sym == "OKB":
+                        okb += bal
         except Exception as exc:
             LOG.warning("Portfolio parse error: %s", exc)
-        return {"usdc_balance": round(usdc, 2), "total_usd": round(total, 2), "aave_supplied": 0}
+        return {"usdc_balance": round(usdc, 2), "usdt_balance": round(usdt, 2),
+                "okb_balance": round(okb, 4), "total_usd": round(total, 2), "aave_supplied": 0}
 
     def _security_scan(self, market_data: dict):
         """Run okx-security on any new tokens from signals/memes."""
@@ -227,22 +237,33 @@ class TriMindAgent:
             f"X Layer (chain 196, zero gas). "
             f"Portfolio: ${portfolio.get('total_usd', 0):.2f} total, "
             f"${portfolio.get('usdc_balance', 0):.2f} idle USDC, "
+            f"${portfolio.get('usdt_balance', 0):.2f} USDT, "
+            f"${portfolio.get('okb_balance', 0):.4f} OKB, "
             f"${portfolio.get('aave_supplied', 0):.2f} in Aave. "
             f"Signals: {signals_count} smart money buys. "
             f"Memes: {memes_count} new tokens detected. "
-            f"Should we: supply idle USDC to Aave, swap into an opportunity, "
-            f"add LP, or hold? DRY_RUN={config.DRY_RUN}."
+            f"Should we: supply idle USDC to Aave (swap USDC→USDT), rebalance (swap USDT→USDC), "
+            f"diversify (buy OKB), swap into an opportunity, or hold? DRY_RUN={config.DRY_RUN}."
         )
 
     def _execute_action(self, decision: dict, market_data: dict):
-        """Execute the consensus action via OnchainOS skills."""
+        """Execute the consensus action via OnchainOS skills.
+
+        Supported actions:
+            supply_aave  -- swap USDC → USDT (yield strategy)
+            swap         -- swap USDC → USDT (opportunity)
+            rebalance    -- swap USDT → USDC (rebalance back)
+            diversify    -- swap small USDC → OKB (portfolio diversification)
+        """
         action = decision.get("action", "none")
         portfolio = market_data.get("portfolio", {})
         usdc = portfolio.get("usdc_balance", 0)
+        usdt = portfolio.get("usdt_balance", 0)
 
         if action == "supply_aave":
+            # USDC → USDT: yield strategy
             if usdc > 5:
-                supply_amt = min(usdc * 0.2, 10.0)  # conservative: 20% of idle, max $10
+                supply_amt = min(usdc * 0.2, 5.0)  # conservative: 20% of idle, max $5
                 LOG.info("EXECUTING: Swap $%.2f USDC → USDT on X Layer (yield strategy)", supply_amt)
                 ok, result = swap_execute(USDC_XLAYER, USDT_XLAYER, supply_amt,
                                           config.XLAYER_CHAIN_ID, slippage="3.0")
@@ -258,6 +279,7 @@ class TriMindAgent:
                 LOG.info("SKIP supply_aave: USDC $%.2f < $5 minimum", usdc)
 
         elif action == "swap":
+            # USDC → USDT: opportunity trade
             if usdc > 5:
                 swap_amt = min(3.0, usdc * 0.1)  # small: $3 max per swap
                 LOG.info("EXECUTING: Swap $%.2f USDC → USDT on X Layer", swap_amt)
@@ -273,6 +295,43 @@ class TriMindAgent:
                     self._last_fail_action = "swap"
             else:
                 LOG.info("SKIP swap: USDC $%.2f < $5 minimum", usdc)
+
+        elif action == "rebalance":
+            # USDT → USDC: rebalance portfolio back toward USDC
+            if usdt > 3:
+                rebal_amt = min(usdt * 0.3, 5.0)  # 30% of USDT, max $5
+                LOG.info("EXECUTING: Rebalance $%.2f USDT → USDC on X Layer", rebal_amt)
+                ok, result = swap_execute(USDT_XLAYER, USDC_XLAYER, rebal_amt,
+                                          config.XLAYER_CHAIN_ID, slippage="3.0")
+                self.api_calls += 1
+                if ok:
+                    record_position(self.db, "USDT→USDC", "rebalance_xlayer", rebal_amt)
+                    self.notifier.report_trade("rebalance", rebal_amt, str(result)[:200])
+                    LOG.info("Rebalance executed: %s", str(result)[:200])
+                else:
+                    LOG.warning("Rebalance failed: %s", str(result)[:200])
+                    self._last_fail_action = "rebalance"
+            else:
+                LOG.info("SKIP rebalance: USDT $%.2f < $3 minimum", usdt)
+
+        elif action == "diversify":
+            # USDC → OKB: small diversification trade
+            if usdc > 5:
+                div_amt = min(2.0, usdc * 0.05)  # tiny: $1-2 max
+                div_amt = max(div_amt, 1.0)  # at least $1
+                LOG.info("EXECUTING: Diversify $%.2f USDC → OKB on X Layer", div_amt)
+                ok, result = swap_execute(USDC_XLAYER, OKB_XLAYER, div_amt,
+                                          config.XLAYER_CHAIN_ID, slippage="5.0")
+                self.api_calls += 1
+                if ok:
+                    record_position(self.db, "USDC→OKB", "diversify_xlayer", div_amt)
+                    self.notifier.report_trade("diversify", div_amt, str(result)[:200])
+                    LOG.info("Diversify executed: %s", str(result)[:200])
+                else:
+                    LOG.warning("Diversify failed: %s", str(result)[:200])
+                    self._last_fail_action = "diversify"
+            else:
+                LOG.info("SKIP diversify: USDC $%.2f < $5 minimum", usdc)
 
         else:
             LOG.info("Action '%s' -- no execution needed", action)
