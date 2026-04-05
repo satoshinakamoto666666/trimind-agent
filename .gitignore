@@ -8,3 +8,8 @@ data/blacklist.jsonl
 .vscode/
 .idea/
 node_modules/
+prompts/
+responses/
+demo/
+logs/
+db/
