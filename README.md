@@ -9,7 +9,7 @@
 
 > Autonomous AI DeFi agent deployed on OKX X Layer that uses **all 13 OnchainOS skills** with a multi-AI consensus engine -- three independent AI minds must agree before any on-chain execution.
 
-**Track**: X Layer Arena | **Hackathon**: OKX Build-X 2026 | **Chain**: X Layer (196)
+**Track**: X Layer Arena | **Hackathon**: OKX Build-X 2026 | **Chain**: X Layer (196) | **Discord**: [Join](https://discord.gg/vzHv7F2qpT)
 
 ---
 
