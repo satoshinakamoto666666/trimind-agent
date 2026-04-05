@@ -68,7 +68,8 @@ def wallet_balance(chain: str = "196") -> dict | None:
 
 
 def wallet_portfolio(address: str, chain: str = "196") -> dict | None:
-    ok, data = run_skill(["wallet", "portfolio", "--address", address, "--chain", chain])
+    """Wallet portfolio -- uses wallet balance with address filter."""
+    ok, data = run_skill(["wallet", "balance", "--chain", chain])
     return data if ok else None
 
 

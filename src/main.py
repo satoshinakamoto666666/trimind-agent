@@ -18,7 +18,7 @@ from db import init_db, record_decision, record_scan, record_position, get_stats
 from agents.trimind import trimind_consensus
 from skills.base import (
     wallet_balance, wallet_portfolio, security_scan, market_price,
-    signal_list, token_info, token_price_info, trenches_scan,
+    market_kline, signal_list, token_info, token_price_info, trenches_scan,
     trenches_dev_info, swap_execute, defi_positions,
     gateway_simulate, audit_log_export,
 )
