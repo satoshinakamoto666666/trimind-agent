@@ -144,20 +144,21 @@ def trenches_dev_info(token_address: str, chain: str = "196") -> dict | None:
     return data.get("data", data) if isinstance(data, dict) else data
 
 
-def swap_execute(from_token: str, to_token: str, amount: str, chain: str = "196",
+def swap_execute(from_token: str, to_token: str, amount_usd: float, chain: str = "196",
                  slippage: str = "1.0", wallet: str = "") -> tuple[bool, str]:
-    """Execute swap. Returns (success, stdout)."""
+    """Execute swap with readable amount. Returns (success, stdout)."""
     from config import EVM_WALLET, DRY_RUN
     w = wallet or EVM_WALLET
     if DRY_RUN:
-        LOG.info("[DRY_RUN] swap %s -> %s amount=%s chain=%s", from_token[:10], to_token[:10], amount, chain)
+        LOG.info("[DRY_RUN] swap %s -> %s $%.2f chain=%s", from_token[:10], to_token[:10], amount_usd, chain)
         return True, '{"dry_run": true}'
     cmd = [ONCHAINOS, "swap", "execute", "--chain", chain,
            "--from", from_token, "--to", to_token,
-           "--amount", amount, "--slippage", slippage, "--wallet", w]
+           "--readable-amount", str(amount_usd), "--slippage", slippage, "--wallet", w]
     try:
         env = _build_env()
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
+        LOG.info("Swap result: exit=%d stdout=%s", proc.returncode, (proc.stdout or "")[:300])
         return proc.returncode == 0, proc.stdout or proc.stderr or ""
     except Exception as exc:
         return False, str(exc)

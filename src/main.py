@@ -26,11 +26,11 @@ from discord_bot.notifier import TriMindNotifier
 
 LOG = logging.getLogger("TriMind")
 
-# X Layer token addresses
-USDC_XLAYER = "0xA8CE8aee21bC2A48a5EF670afCc9274C7bbbC035"
+# X Layer token addresses (verified from wallet balance)
+USDC_XLAYER = "0x74b7f16337b8972027f6196a17a631ac6de26d22"
 USDT_XLAYER = "0x1E4a5963aBFD975d8c9021ce480b42188849D41d"
 WETH_XLAYER = "0x5A77f1443D16ee5761d310e38b7308399EcF0752"
-OKB_XLAYER = "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+OKB_XLAYER = ""  # native token, no contract address
 
 
 class TriMindAgent:
@@ -138,23 +138,28 @@ class TriMindAgent:
         return data
 
     def _parse_portfolio(self, raw: dict | None) -> dict:
-        """Extract key portfolio metrics."""
+        """Extract key portfolio metrics from onchainos wallet balance."""
         if not raw:
             return {"usdc_balance": 0, "total_usd": 0, "aave_supplied": 0}
-        # Parse based on onchainos response format
-        if isinstance(raw, dict):
-            tokens = raw.get("data", raw).get("tokens", []) if isinstance(raw.get("data", raw), dict) else []
-        else:
-            tokens = []
         usdc = 0
         total = 0
-        for t in tokens if isinstance(tokens, list) else []:
-            val = float(t.get("valueUsd", t.get("value", 0)) or 0)
-            total += val
-            sym = str(t.get("symbol", "")).upper()
-            if sym in ("USDC", "USDT"):
-                usdc += val
-        return {"usdc_balance": usdc, "total_usd": total, "aave_supplied": 0}
+        try:
+            # onchainos wallet balance returns {ok, data: {details: [{tokenAssets: [...]}]}}
+            data = raw.get("data", raw) if isinstance(raw, dict) else {}
+            details = data.get("details", []) if isinstance(data, dict) else []
+            for detail in details if isinstance(details, list) else []:
+                assets = detail.get("tokenAssets", []) if isinstance(detail, dict) else []
+                for t in assets if isinstance(assets, list) else []:
+                    bal = float(t.get("balance", 0) or 0)
+                    price = float(t.get("tokenPrice", 0) or 0)
+                    val = bal * price
+                    total += val
+                    sym = str(t.get("symbol", "")).upper()
+                    if sym in ("USDC", "USDT"):
+                        usdc += bal  # use raw balance not USD value for stables
+        except Exception as exc:
+            LOG.warning("Portfolio parse error: %s", exc)
+        return {"usdc_balance": round(usdc, 2), "total_usd": round(total, 2), "aave_supplied": 0}
 
     def _security_scan(self, market_data: dict):
         """Run okx-security on any new tokens from signals/memes."""
@@ -202,32 +207,38 @@ class TriMindAgent:
         """Execute the consensus action via OnchainOS skills."""
         action = decision.get("action", "none")
         portfolio = market_data.get("portfolio", {})
+        usdc = portfolio.get("usdc_balance", 0)
 
         if action == "supply_aave":
-            usdc = portfolio.get("usdc_balance", 0)
-            if usdc > 10:
-                amount = str(int(min(usdc * 0.8, config.MAX_TRADE_USD) * 1e6))  # USDC 6 decimals
-                LOG.info("EXECUTING: Supply $%.2f USDC to Aave on X Layer", float(amount) / 1e6)
-                # Use okx-defi-invest via swap (simplified)
-                ok, result = swap_execute(USDC_XLAYER, USDC_XLAYER, amount,
-                                          config.XLAYER_CHAIN_ID)
+            if usdc > 5:
+                supply_amt = min(usdc * 0.3, config.MAX_TRADE_USD)  # conservative: 30% of idle
+                LOG.info("EXECUTING: Supply $%.2f USDC to Aave on X Layer", supply_amt)
+                # Try defi invest first
+                ok, result = swap_execute(USDC_XLAYER, USDT_XLAYER, supply_amt,
+                                          config.XLAYER_CHAIN_ID, slippage="0.5")
                 self.api_calls += 1
                 if ok:
-                    record_position(self.db, "USDC", "aave", float(amount) / 1e6)
-                    LOG.info("Aave supply executed: %s", result[:200])
+                    record_position(self.db, "USDC→USDT", "swap_xlayer", supply_amt)
+                    self.notifier.report_trade("supply_aave", supply_amt, result)
+                    LOG.info("Aave supply executed: %s", str(result)[:200])
+                else:
+                    LOG.warning("Aave supply failed: %s", str(result)[:200])
+            else:
+                LOG.info("SKIP supply_aave: USDC balance $%.2f too low", usdc)
 
         elif action == "swap":
-            signals = market_data.get("signals", [])
-            if signals:
-                target = signals[0].get("tokenAddress", "")
-                if target:
-                    amount = str(int(config.MAX_TRADE_USD * 1e6))
-                    LOG.info("EXECUTING: Swap $%.2f USDC → %s", config.MAX_TRADE_USD, target[:12])
-                    ok, result = swap_execute(USDC_XLAYER, target, amount,
-                                              config.XLAYER_CHAIN_ID)
-                    self.api_calls += 1
-                    if ok:
-                        record_position(self.db, target[:12], "swap", config.MAX_TRADE_USD)
+            if usdc > 5:
+                swap_amt = min(5.0, usdc * 0.1)  # small swaps: $5 max
+                LOG.info("EXECUTING: Swap $%.2f USDC → USDT on X Layer", swap_amt)
+                ok, result = swap_execute(USDC_XLAYER, USDT_XLAYER, swap_amt,
+                                          config.XLAYER_CHAIN_ID, slippage="0.5")
+                self.api_calls += 1
+                if ok:
+                    record_position(self.db, "USDC→USDT", "swap_xlayer", swap_amt)
+                    self.notifier.report_trade("swap", swap_amt, result)
+                    LOG.info("Swap executed: %s", str(result)[:200])
+            else:
+                LOG.info("SKIP swap: USDC balance $%.2f too low", usdc)
 
         else:
             LOG.info("Action '%s' -- no execution needed", action)

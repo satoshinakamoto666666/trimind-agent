@@ -110,6 +110,20 @@ class TriMindNotifier:
             "timestamp": self._iso(),
         })
 
+    def report_trade(self, action: str, amount: float, result: str):
+        """Trade execution embed."""
+        self._send({
+            "title": f"💰 EXECUTED: {action.upper()}",
+            "description": f"${amount:.2f} on X Layer (chain 196)",
+            "color": GREEN,
+            "fields": [
+                {"name": "Action", "value": action, "inline": True},
+                {"name": "Amount", "value": f"${amount:.2f}", "inline": True},
+                {"name": "Result", "value": str(result)[:200], "inline": False},
+            ],
+            "timestamp": self._iso(),
+        })
+
     def report_error(self, error: str):
         self._send({
             "title": "⚠️ ERROR",
