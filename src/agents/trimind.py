@@ -263,7 +263,7 @@ def _agent_logic_vote(market_data: dict) -> dict:
         {
             "vote": "HOLD",
             "confidence": 0.52,
-            "reasoning": f"Portfolio is within operating bands (USDC share {usdc_share:.0%}, WETH share {weth_share:.0%})",
+            "reasoning": f"Portfolio is within operating bands (USDC share {usdc_share:.0%}, beta share {weth_share:.0%})",
             "action": "none",
             "risk_score": 0.10,
         }
@@ -339,3 +339,4 @@ async def trimind_consensus(prompt: str, market_data: dict) -> dict[str, Any]:
         )
 
     return result
+

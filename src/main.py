@@ -39,7 +39,7 @@ LOG = logging.getLogger("TriMind")
 USDC_XLAYER = "0x74b7f16337b8972027f6196a17a631ac6de26d22"
 USDT_XLAYER = "0x1E4a5963aBFD975d8c9021ce480b42188849D41d"
 AAVE_USDT_XLAYER = "0x779ded0c9e1022225f8e0630b35a9b54be713736"
-WETH_XLAYER = "0x5A77f1443D16ee5761d310e38b7308399EcF0752"
+WETH_XLAYER = "0xfdc4a45a4bf53957b2c73b1ff323d8cbe39118dd"
 
 
 class TriMindAgent:
@@ -126,7 +126,7 @@ class TriMindAgent:
 
         memes = trenches_scan(config.XLAYER_CHAIN_ID)
         self.api_calls += 1
-        data["memes"] = memes[:25] if isinstance(memes, list) else []
+        data["memes"] = memes[:12] if isinstance(memes, list) else []
 
         positions = defi_positions(config.EVM_WALLET, config.XLAYER_CHAIN_ID)
         self.api_calls += 1
@@ -171,7 +171,7 @@ class TriMindAgent:
         self.api_calls += 1
 
         LOG.info(
-            "Market data gathered: USDC=$%.2f XLAYER_USDT=$%.2f AAVE_USDT=$%.2f WETH=$%.2f signals=%d memes=%d api_calls=%d",
+            "Market data gathered: USDC=$%.2f XLAYER_USDT=$%.2f AAVE_USDT=$%.2f TITAN=$%.2f signals=%d memes=%d api_calls=%d",
             data["portfolio"].get("usdc_balance", 0),
             data["portfolio"].get("xlayer_usdt_balance", 0),
             data["portfolio"].get("canonical_usdt_balance", 0),
@@ -303,7 +303,7 @@ class TriMindAgent:
         signals = market_data.get("signals", [])
         memes = market_data.get("memes", [])
         items = (signals if isinstance(signals, list) else []) + (memes if isinstance(memes, list) else [])
-        for item in items[:20]:
+        for item in items[:8]:
             addr = item.get("tokenAddress", item.get("tokenContractAddress", item.get("address", "")))
             if not addr or addr in scanned:
                 continue
@@ -338,7 +338,7 @@ class TriMindAgent:
             f"USDC ${portfolio.get('usdc_balance', 0):.2f}, "
             f"XLAYER USDT ${portfolio.get('xlayer_usdt_balance', 0):.2f}, "
             f"Aave-ready USDT ${portfolio.get('canonical_usdt_balance', 0):.2f}, "
-            f"WETH ${portfolio.get('weth_usd', 0):.2f}. "
+            f"TITAN ${portfolio.get('weth_usd', 0):.2f}. "
             f"Aave USDT APY {aave_market.get('apy', 0):.2%}. "
             f"Quote USDT->USDC 3 receives {rebalance_quote.get('to_amount', 0):.4f}. "
             f"Quote XLAYER USDT->Aave USDT 3 receives {yield_quote.get('to_amount', 0):.4f}. "
@@ -462,7 +462,7 @@ class TriMindAgent:
                 LOG.info("SKIP diversify: USDC $%.2f total $%.2f too small", usdc, total_usd)
                 return False, "portfolio too small"
             div_amt = min(config.MAX_DIVERSIFY_USD, max(1.0, usdc * 0.15))
-            LOG.info("EXECUTING: diversify $%.2f USDC -> WETH", div_amt)
+            LOG.info("EXECUTING: diversify $%.2f USDC -> TITAN", div_amt)
             ok, result = swap_execute(
                 USDC_XLAYER,
                 WETH_XLAYER,
@@ -473,7 +473,7 @@ class TriMindAgent:
             self.api_calls += 1
             if ok:
                 tx_ref = self._extract_tx_ref(result)
-                record_position(self.db, "USDC->WETH", "diversify_beta", div_amt, tx_ref)
+                record_position(self.db, "USDC->TITAN", "diversify_beta", div_amt, tx_ref)
                 self.notifier.report_trade("diversify", div_amt, result)
                 return True, json.dumps(result, default=str)[:1000]
             LOG.warning("Diversify failed: %s", json.dumps(result, default=str)[:300])
@@ -532,3 +532,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+

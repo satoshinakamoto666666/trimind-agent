@@ -137,7 +137,7 @@ class TriMindNotifier:
                     f"USDC ${portfolio.get('usdc_balance', 0):,.2f} | "
                     f"XLAYER USDT ${portfolio.get('xlayer_usdt_balance', 0):,.2f} | "
                     f"Aave USDT ${portfolio.get('canonical_usdt_balance', 0):,.2f} | "
-                    f"WETH ${portfolio.get('weth_usd', 0):,.2f}"
+                    f"TITAN ${portfolio.get('weth_usd', 0):,.2f}"
                 )[:1024],
                 "inline": False,
             },
@@ -202,7 +202,7 @@ class TriMindNotifier:
                         "value": f"${balance_data.get('canonical_usdt_balance', 0):,.2f}",
                         "inline": True,
                     },
-                    {"name": "WETH USD", "value": f"${balance_data.get('weth_usd', 0):,.2f}", "inline": True},
+                    {"name": "TITAN USD", "value": f"${balance_data.get('weth_usd', 0):,.2f}", "inline": True},
                     {"name": "OKB USD", "value": f"${balance_data.get('okb_usd', 0):,.2f}", "inline": True},
                     {"name": "Total USD", "value": f"${balance_data.get('total_usd', 0):,.2f}", "inline": False},
                 ],
@@ -242,3 +242,4 @@ class TriMindNotifier:
         from datetime import datetime, timezone
 
         return datetime.now(timezone.utc).isoformat()
+
