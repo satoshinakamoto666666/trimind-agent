@@ -2,7 +2,7 @@
 
 ### Three Minds. One Consensus. Zero Gas.
 
-> Autonomous AI DeFi agent deployed on OKX X Layer where **GPT-5.4** and **Grok-4.20** debate every trade decision in real-time, reaching consensus before any on-chain execution.
+> Autonomous AI DeFi agent deployed on OKX X Layer that uses **all 13 OnchainOS skills** with a multi-AI consensus engine -- three independent AI minds must agree before any on-chain execution.
 
 **Track**: X Layer Arena | **Hackathon**: OKX Build-X 2026 | **Chain**: X Layer (196)
 
@@ -13,27 +13,27 @@
 Every 2 minutes, TriMind runs an autonomous decision loop:
 
 ```
-  Scan X Layer DeFi (OnchainOS)
+  Scan X Layer DeFi via OnchainOS (13 skills)
           |
           v
   +-------------------+
-  |   GPT-5.4         |  "Idle USDC should earn yield on Aave"  --> EXECUTE
-  |   Strategy & Risk |
+  |   Mind 1           |  "Idle USDC should earn yield on Aave"  --> EXECUTE
+  |   Strategy & Risk  |
   +-------------------+
           |
   +-------------------+
-  |   Grok-4.20       |  "No risk signals, best to supply Aave" --> EXECUTE  
+  |   Mind 2           |  "No risk signals, best to supply Aave" --> EXECUTE  
   |   Sentiment Oracle |
   +-------------------+
           |
   +-------------------+
-  |   Agent Logic      |  "Idle funds detected, safe conditions" --> EXECUTE
+  |   Mind 3           |  "Idle funds detected, safe conditions" --> EXECUTE
   |   Rule Engine      |
   +-------------------+
           |
           v
   Consensus: 3/3 --> EXECUTE
-  $17.14 USDC supplied to Aave on X Layer
+  $17.14 USDC swapped autonomously on X Layer (zero gas)
 ```
 
 **2 out of 3 minds must agree before ANY on-chain action.** No single AI controls the wallet.
@@ -86,9 +86,9 @@ deployment/
 ## Key Features
 
 **Multi-AI Consensus**
-- GPT-5.4 as Strategy Architect (risk assessment, yield analysis)
-- Grok-4.20 as Sentiment Oracle (market mood, social signals)
-- Agent Logic as Rule Engine (portfolio rules, safety checks)
+- Mind 1: Strategy Architect (risk assessment, yield analysis)
+- Mind 2: Sentiment Oracle (market mood, social signals)
+- Mind 3: Rule Engine (portfolio rules, safety checks)
 - 2/3 must agree -- no single point of failure
 
 **Autonomous 24/7 Operation**
@@ -147,8 +147,8 @@ journalctl -u trimind -f
 | `OKX_DEX_SECRET_KEY` | OnchainOS secret |
 | `OKX_DEX_PASSPHRASE` | OnchainOS passphrase |
 | `OKX_DEX_PROJECT_ID` | OnchainOS project ID |
-| `OPENAI_API_KEY` | GPT API key (Mind 1) |
-| `GROK_API_KEY` | Grok API key (Mind 2) |
+| `OPENAI_API_KEY` | LLM API key (Mind 1 - Strategy) |
+| `GROK_API_KEY` | LLM API key (Mind 2 - Sentiment) |
 | `EVM_WALLET` | Agent's X Layer wallet address |
 | `DISCORD_WEBHOOK_URL` | Discord channel webhook |
 | `DRY_RUN` | `true` for simulation, `false` for live |
@@ -166,13 +166,13 @@ The agent is running on X Layer right now:
 
 ## Tech Stack
 
+- **OKX X Layer** -- chain 196, zkEVM, zero gas
+- **OnchainOS** -- all 13 skills (72 features) via CLI
 - **Python 3.12** -- async agent loop
-- **OnchainOS CLI** -- all 13 skills via subprocess
-- **OpenAI API** -- GPT-5.4 for strategy
-- **xAI API** -- Grok-4.20 for sentiment  
+- **Multi-AI consensus** -- pluggable LLM backends for independent analysis
 - **SQLite** -- persistent state, decisions, audit log
-- **Discord.py** -- real-time council vote notifications
-- **systemd** -- 24/7 autonomous operation
+- **Discord** -- real-time council vote notifications
+- **systemd** -- 24/7 autonomous VPS operation
 
 ## License
 
