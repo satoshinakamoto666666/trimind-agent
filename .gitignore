@@ -1,0 +1,10 @@
+secrets/
+.env
+*.pyc
+__pycache__/
+data/dev_intel.db
+data/blacklist.jsonl
+*.tmp
+.vscode/
+.idea/
+node_modules/
