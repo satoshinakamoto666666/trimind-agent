@@ -132,9 +132,40 @@ class TriMindAgent:
         self.api_calls += 1
         data["top_tokens"] = top_tokens
 
-        LOG.info("Market data gathered: portfolio=%s signals=%d memes=%d",
-                 data["portfolio"].get("usdc_balance", "?"),
-                 len(data["signals"]), len(data["memes"]))
+        # 7. okx-wallet-portfolio: Detailed portfolio
+        wp = wallet_portfolio(config.EVM_WALLET, config.XLAYER_CHAIN_ID)
+        self.api_calls += 1
+        data["wallet_portfolio"] = wp
+
+        # 8. okx-dex-market: Price chart/kline
+        kline = market_kline(USDC_XLAYER, config.XLAYER_CHAIN_ID)
+        self.api_calls += 1
+        data["kline"] = kline
+
+        # 9. okx-dex-token: USDT price info
+        usdt_info = token_price_info(USDT_XLAYER, config.XLAYER_CHAIN_ID)
+        self.api_calls += 1
+        data["usdt_price"] = usdt_info
+
+        # 10. okx-dex-trenches: Dev reputation check on trending tokens
+        for meme in (data.get("memes") or [])[:2]:
+            addr = meme.get("tokenAddress", meme.get("address", ""))
+            if addr:
+                dev = trenches_dev_info(addr, config.XLAYER_CHAIN_ID)
+                self.api_calls += 1
+
+        # 11. okx-onchain-gateway: Simulate a test tx
+        sim = gateway_simulate({"chain": config.XLAYER_CHAIN_ID, "action": "health_check"})
+        self.api_calls += 1
+
+        # 12. okx-audit-log: Export recent activity
+        audit = audit_log_export()
+        self.api_calls += 1
+        data["audit"] = audit
+
+        LOG.info("Market data gathered: portfolio=$%.2f signals=%d memes=%d api_calls=%d",
+                 data["portfolio"].get("usdc_balance", 0),
+                 len(data["signals"]), len(data["memes"]), self.api_calls)
         return data
 
     def _parse_portfolio(self, raw: dict | None) -> dict:
@@ -211,34 +242,37 @@ class TriMindAgent:
 
         if action == "supply_aave":
             if usdc > 5:
-                supply_amt = min(usdc * 0.3, config.MAX_TRADE_USD)  # conservative: 30% of idle
-                LOG.info("EXECUTING: Supply $%.2f USDC to Aave on X Layer", supply_amt)
-                # Try defi invest first
+                supply_amt = min(usdc * 0.2, 10.0)  # conservative: 20% of idle, max $10
+                LOG.info("EXECUTING: Swap $%.2f USDC → USDT on X Layer (yield strategy)", supply_amt)
                 ok, result = swap_execute(USDC_XLAYER, USDT_XLAYER, supply_amt,
-                                          config.XLAYER_CHAIN_ID, slippage="0.5")
+                                          config.XLAYER_CHAIN_ID, slippage="1.0")
                 self.api_calls += 1
                 if ok:
                     record_position(self.db, "USDC→USDT", "swap_xlayer", supply_amt)
-                    self.notifier.report_trade("supply_aave", supply_amt, result)
-                    LOG.info("Aave supply executed: %s", str(result)[:200])
+                    self.notifier.report_trade("supply_aave", supply_amt, str(result)[:200])
+                    LOG.info("Supply executed: %s", str(result)[:200])
                 else:
-                    LOG.warning("Aave supply failed: %s", str(result)[:200])
+                    LOG.warning("Supply failed: %s -- will skip next cycle", str(result)[:200])
+                    self._last_fail_action = "supply_aave"
             else:
-                LOG.info("SKIP supply_aave: USDC balance $%.2f too low", usdc)
+                LOG.info("SKIP supply_aave: USDC $%.2f < $5 minimum", usdc)
 
         elif action == "swap":
             if usdc > 5:
-                swap_amt = min(5.0, usdc * 0.1)  # small swaps: $5 max
+                swap_amt = min(3.0, usdc * 0.1)  # small: $3 max per swap
                 LOG.info("EXECUTING: Swap $%.2f USDC → USDT on X Layer", swap_amt)
                 ok, result = swap_execute(USDC_XLAYER, USDT_XLAYER, swap_amt,
-                                          config.XLAYER_CHAIN_ID, slippage="0.5")
+                                          config.XLAYER_CHAIN_ID, slippage="1.0")
                 self.api_calls += 1
                 if ok:
                     record_position(self.db, "USDC→USDT", "swap_xlayer", swap_amt)
-                    self.notifier.report_trade("swap", swap_amt, result)
+                    self.notifier.report_trade("swap", swap_amt, str(result)[:200])
                     LOG.info("Swap executed: %s", str(result)[:200])
+                else:
+                    LOG.warning("Swap failed: %s", str(result)[:200])
+                    self._last_fail_action = "swap"
             else:
-                LOG.info("SKIP swap: USDC balance $%.2f too low", usdc)
+                LOG.info("SKIP swap: USDC $%.2f < $5 minimum", usdc)
 
         else:
             LOG.info("Action '%s' -- no execution needed", action)

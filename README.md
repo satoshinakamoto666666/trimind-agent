@@ -112,8 +112,8 @@ deployment/
 
 ```bash
 # Clone
-git clone https://github.com/satoshinakamoto666666/AlphaAgentX.git
-cd AlphaAgentX
+git clone https://github.com/satoshinakamoto666666/trimind-agent.git
+cd trimind-agent
 
 # Install
 pip install -r requirements.txt

@@ -95,7 +95,7 @@ def market_kline(token_address: str, chain: str = "196", bar: str = "5m", limit:
 def signal_list(chain: str = "196", tracker_type: str = "smart_money") -> list:
     """Get SM/KOL/whale signals. Always returns a list."""
     ok, data = run_skill(["tracker", "activities", "--tracker-type", tracker_type,
-                          "--chain", "solana", "--trade-type", "1"])
+                          "--chain", chain, "--trade-type", "1"])
     if not ok or data is None:
         return []
     if isinstance(data, list):
@@ -127,7 +127,7 @@ def token_price_info(token_address: str, chain: str = "196") -> dict | None:
 
 def trenches_scan(chain: str = "196") -> list:
     """Scan meme tokens via dex-trenches. Returns list, never None."""
-    ok, data = run_skill(["memepump", "tokens", "--chain", "solana", "--stage", "GROWING"])
+    ok, data = run_skill(["memepump", "tokens", "--chain", chain, "--stage", "GROWING"])
     if not ok or data is None:
         return []
     if isinstance(data, list):

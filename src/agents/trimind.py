@@ -52,7 +52,12 @@ async def _call_openai(prompt: str, data: str) -> dict | None:
                     return None
                 result = await resp.json()
                 content = result["choices"][0]["message"]["content"].strip()
+                if content.startswith("```"):
+                    content = content.split("\n", 1)[1].rsplit("```", 1)[0].strip()
                 return json.loads(content)
+    except (json.JSONDecodeError, KeyError, IndexError) as exc:
+        LOG.warning("GPT parse error: %s", exc)
+        return None
     except Exception as exc:
         LOG.warning("GPT call failed: %s", exc)
         return None
@@ -85,6 +90,9 @@ async def _call_grok(prompt: str, data: str) -> dict | None:
                 if content.startswith("```"):
                     content = content.split("\n", 1)[1].rsplit("```", 1)[0].strip()
                 return json.loads(content)
+    except (json.JSONDecodeError, KeyError, IndexError) as exc:
+        LOG.warning("Grok parse error: %s", exc)
+        return None
     except Exception as exc:
         LOG.warning("Grok call failed: %s", exc)
         return None
