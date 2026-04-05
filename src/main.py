@@ -266,7 +266,7 @@ class TriMindAgent:
                 supply_amt = min(usdc * 0.2, 5.0)  # conservative: 20% of idle, max $5
                 LOG.info("EXECUTING: Swap $%.2f USDC → USDT on X Layer (yield strategy)", supply_amt)
                 ok, result = swap_execute(USDC_XLAYER, USDT_XLAYER, supply_amt,
-                                          config.XLAYER_CHAIN_ID, slippage="3.0")
+                                          config.XLAYER_CHAIN_ID, slippage="5.0")
                 self.api_calls += 1
                 if ok:
                     record_position(self.db, "USDC→USDT", "swap_xlayer", supply_amt)
@@ -284,7 +284,7 @@ class TriMindAgent:
                 swap_amt = min(3.0, usdc * 0.1)  # small: $3 max per swap
                 LOG.info("EXECUTING: Swap $%.2f USDC → USDT on X Layer", swap_amt)
                 ok, result = swap_execute(USDC_XLAYER, USDT_XLAYER, swap_amt,
-                                          config.XLAYER_CHAIN_ID, slippage="3.0")
+                                          config.XLAYER_CHAIN_ID, slippage="5.0")
                 self.api_calls += 1
                 if ok:
                     record_position(self.db, "USDC→USDT", "swap_xlayer", swap_amt)
@@ -302,7 +302,7 @@ class TriMindAgent:
                 rebal_amt = min(usdt * 0.3, 5.0)  # 30% of USDT, max $5
                 LOG.info("EXECUTING: Rebalance $%.2f USDT → USDC on X Layer", rebal_amt)
                 ok, result = swap_execute(USDT_XLAYER, USDC_XLAYER, rebal_amt,
-                                          config.XLAYER_CHAIN_ID, slippage="3.0")
+                                          config.XLAYER_CHAIN_ID, slippage="5.0")
                 self.api_calls += 1
                 if ok:
                     record_position(self.db, "USDT→USDC", "rebalance_xlayer", rebal_amt)
