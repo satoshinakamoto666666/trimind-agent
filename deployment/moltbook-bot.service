@@ -1,0 +1,16 @@
+[Unit]
+Description=TriMind Moltbook Engagement Bot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/OKXBuildXHackathon
+ExecStart=/usr/bin/python3 /root/OKXBuildXHackathon/src/moltbook_bot.py
+Restart=always
+RestartSec=30
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/root/OKXBuildXHackathon/.env
+
+[Install]
+WantedBy=multi-user.target
