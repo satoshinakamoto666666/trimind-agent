@@ -368,6 +368,9 @@ class TriMindAgent:
         usdc = float(portfolio.get("usdc_balance", 0))
         xlayer_usdt = float(portfolio.get("xlayer_usdt_balance", portfolio.get("usdt_balance", 0)))
         canonical_usdt = float(portfolio.get("canonical_usdt_balance", 0))
+        # Use whichever USDT variant has more balance
+        best_usdt = max(xlayer_usdt, canonical_usdt)
+        best_usdt_token = USDT_XLAYER if xlayer_usdt >= canonical_usdt else AAVE_USDT_XLAYER
         total_usd = float(portfolio.get("total_usd", 0))
         aave_market = market_data.get("aave_market", {})
 
@@ -375,10 +378,10 @@ class TriMindAgent:
             if not aave_market:
                 LOG.info("SKIP supply_aave: no Aave market discovered")
                 return False, "no aave market"
-            if xlayer_usdt < max(5.0, config.MIN_TRADE_USD):
-                LOG.info("SKIP supply_aave: XLAYER USDT $%.2f below minimum", xlayer_usdt)
-                return False, "insufficient xlayer usdt"
-            supply_amt = min(config.MAX_REBALANCE_USD, max(2.0, xlayer_usdt * 0.10))
+            if best_usdt < config.MIN_TRADE_USD:
+                LOG.info("SKIP supply_aave: best USDT $%.2f below minimum", best_usdt)
+                return False, "insufficient usdt"
+            supply_amt = min(config.MAX_REBALANCE_USD, max(2.0, best_usdt * 0.10))
             underlying = aave_market.get("underlying_token", AAVE_USDT_XLAYER)
             if canonical_usdt + 0.01 < supply_amt:
                 LOG.info("EXECUTING: convert $%.2f XLAYER USDT -> Aave USDT", supply_amt)
@@ -413,12 +416,6 @@ class TriMindAgent:
             return False, json.dumps(result, default=str)[:1000]
 
         if action == "rebalance":
-            # Use whichever USDT variant has more balance: XLAYER USDT or USD₮0
-            best_usdt = xlayer_usdt
-            best_usdt_token = USDT_XLAYER
-            if canonical_usdt > xlayer_usdt:
-                best_usdt = canonical_usdt
-                best_usdt_token = AAVE_USDT_XLAYER
             if best_usdt < config.MIN_TRADE_USD:
                 LOG.info("SKIP rebalance: best USDT $%.2f below minimum", best_usdt)
                 return False, "insufficient usdt"
@@ -442,22 +439,26 @@ class TriMindAgent:
             return False, json.dumps(result, default=str)[:1000]
 
         if action == "swap":
-            if usdc < config.MIN_TRADE_USD:
-                LOG.info("SKIP swap: USDC $%.2f below minimum", usdc)
-                return False, "insufficient usdc"
-            swap_amt = min(config.MAX_REBALANCE_USD, max(config.MIN_TRADE_USD, usdc * 0.25))
-            LOG.info("EXECUTING: tactical swap $%.2f USDC -> USD₮0", swap_amt)
-            ok, result = swap_execute(
-                USDC_XLAYER,
-                AAVE_USDT_XLAYER,
-                swap_amt,
-                config.XLAYER_CHAIN_ID,
-                slippage=config.MAX_SLIPPAGE,
-            )
+            # Swap the bigger stablecoin to the smaller one for balance
+            if best_usdt > usdc and best_usdt >= config.MIN_TRADE_USD:
+                swap_amt = min(config.MAX_REBALANCE_USD, max(config.MIN_TRADE_USD, best_usdt * 0.08))
+                LOG.info("EXECUTING: tactical swap $%.2f %s -> USDC", swap_amt, best_usdt_token[:10])
+                ok, result = swap_execute(best_usdt_token, USDC_XLAYER, swap_amt,
+                    config.XLAYER_CHAIN_ID, slippage=config.MAX_SLIPPAGE)
+            elif usdc >= config.MIN_TRADE_USD:
+                swap_amt = min(config.MAX_REBALANCE_USD, max(config.MIN_TRADE_USD, usdc * 0.25))
+                LOG.info("EXECUTING: tactical swap $%.2f USDC -> USD₮0", swap_amt)
+                ok, result = swap_execute(USDC_XLAYER, AAVE_USDT_XLAYER, swap_amt,
+                    config.XLAYER_CHAIN_ID, slippage=config.MAX_SLIPPAGE)
+            else:
+                LOG.info("SKIP swap: both USDC $%.2f and USDT $%.2f below minimum", usdc, best_usdt)
+                return False, "insufficient balance"
+            # common handling below uses ok, result
+            ok, result = ok, result  # already set above
             self.api_calls += 1
             if ok:
                 tx_ref = self._extract_tx_ref(result)
-                record_position(self.db, "USDC->USDT", "swap_xlayer", swap_amt, tx_ref)
+                record_position(self.db, "swap", "swap_xlayer", swap_amt, tx_ref)
                 self.notifier.report_trade("swap", swap_amt, result)
                 return True, json.dumps(result, default=str)[:1000]
             LOG.warning("Swap failed: %s", json.dumps(result, default=str)[:300])
