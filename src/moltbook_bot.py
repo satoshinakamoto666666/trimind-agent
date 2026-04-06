@@ -127,6 +127,7 @@ class MoltbookBot:
         self.last_post_ts = 0
         self.last_comment_ts = 0
         self.last_progress_ts = 0
+        self.last_reset_day = time.strftime("%Y-%m-%d")
         self.replied_comments: set[str] = set()
         self.upvoted_posts: set[str] = set()
 
@@ -134,6 +135,13 @@ class MoltbookBot:
         LOG.info("MoltbookBot started")
         while True:
             try:
+                # Reset daily comment counter
+                today = time.strftime("%Y-%m-%d")
+                if today != self.last_reset_day:
+                    self.comments_today = 0
+                    self.last_reset_day = today
+                    LOG.info("Daily comment counter reset")
+
                 # 1. Reply to comments on our posts
                 await self._reply_to_comments()
 

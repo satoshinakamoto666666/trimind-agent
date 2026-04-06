@@ -1,4 +1,4 @@
-﻿"""TriMind Agent -- Autonomous AI DeFi Agent for OKX X Layer."""
+"""TriMind Agent -- Autonomous AI DeFi Agent for OKX X Layer."""
 
 import asyncio
 import json
@@ -413,14 +413,20 @@ class TriMindAgent:
             return False, json.dumps(result, default=str)[:1000]
 
         if action == "rebalance":
-            if xlayer_usdt < config.MIN_TRADE_USD:
-                LOG.info("SKIP rebalance: XLAYER USDT $%.2f below minimum", xlayer_usdt)
-                return False, "insufficient xlayer usdt"
+            # Use whichever USDT variant has more balance: XLAYER USDT or USD₮0
+            best_usdt = xlayer_usdt
+            best_usdt_token = USDT_XLAYER
+            if canonical_usdt > xlayer_usdt:
+                best_usdt = canonical_usdt
+                best_usdt_token = AAVE_USDT_XLAYER
+            if best_usdt < config.MIN_TRADE_USD:
+                LOG.info("SKIP rebalance: best USDT $%.2f below minimum", best_usdt)
+                return False, "insufficient usdt"
             target_shortfall = max(total_usd * config.TARGET_USDC_SHARE - usdc, config.MIN_TRADE_USD)
-            rebal_amt = min(target_shortfall, config.MAX_REBALANCE_USD, xlayer_usdt)
-            LOG.info("EXECUTING: rebalance $%.2f XLAYER USDT -> USDC", rebal_amt)
+            rebal_amt = min(target_shortfall, config.MAX_REBALANCE_USD, best_usdt)
+            LOG.info("EXECUTING: rebalance $%.2f %s -> USDC", rebal_amt, best_usdt_token[:10])
             ok, result = swap_execute(
-                USDT_XLAYER,
+                best_usdt_token,
                 USDC_XLAYER,
                 rebal_amt,
                 config.XLAYER_CHAIN_ID,
@@ -440,10 +446,10 @@ class TriMindAgent:
                 LOG.info("SKIP swap: USDC $%.2f below minimum", usdc)
                 return False, "insufficient usdc"
             swap_amt = min(config.MAX_REBALANCE_USD, max(config.MIN_TRADE_USD, usdc * 0.25))
-            LOG.info("EXECUTING: tactical swap $%.2f USDC -> XLAYER USDT", swap_amt)
+            LOG.info("EXECUTING: tactical swap $%.2f USDC -> USD₮0", swap_amt)
             ok, result = swap_execute(
                 USDC_XLAYER,
-                USDT_XLAYER,
+                AAVE_USDT_XLAYER,
                 swap_amt,
                 config.XLAYER_CHAIN_ID,
                 slippage=config.MAX_SLIPPAGE,
