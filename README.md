@@ -1,6 +1,6 @@
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
-![X Layer](https://img.shields.io/badge/Chain-X%20Layer%20(196)-black?logo=data:image/svg+xml;base64,)
+![X Layer](https://img.shields.io/badge/Chain-X%20Layer%20(196)-black)
 ![OnchainOS](https://img.shields.io/badge/OnchainOS-13%20Skills-orange)
 
 # TriMind Agent
