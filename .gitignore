@@ -14,4 +14,4 @@ demo/
 logs/
 db/
 social/
-screenshots/
+# screenshots/ — un-ignored so README images render on GitHub
